@@ -862,12 +862,49 @@ void game_dispose(
 	return;
 }
 
+#ifdef HALO_WEB
+/* The browser shell reports which map is loading
+(port/web/src/web_platform.c): the base name of the last map requested,
+without folders or extension. */
+static char game_web_loading_map_name[64];
+
+const char *game_map_loading_name(
+	void)
+{
+	return game_web_loading_map_name;
+}
+
+static void game_web_set_loading_map_name(
+	const char *map_name)
+{
+	const char *base = map_name;
+	const char *scan;
+	unsigned long length;
+
+	for (scan = map_name; *scan; scan++)
+	{
+		if (*scan == '\\' || *scan == '/')
+			base = scan + 1;
+	}
+	for (length = 0;
+		base[length] && base[length] != '.' && length < sizeof(game_web_loading_map_name) - 1;
+		length++)
+	{
+		game_web_loading_map_name[length] = base[length];
+	}
+	game_web_loading_map_name[length] = 0;
+}
+#endif
+
 void game_precache_new_map(
 	char *map_name,
 	boolean blocking)
 {
 	long map_status;
 
+#ifdef HALO_WEB
+	game_web_set_loading_map_name(map_name);
+#endif
 	if (!cache_files_precache_map_loaded(map_name))
 	{
 		if (cache_files_precache_in_progress() &&
