@@ -11,12 +11,19 @@ docker compose down   # stop the services
 
 All the settings are in `.env`.
 
+The Docker images are for the architecture of the computer that made the
+bundle (for example x86-64). A machine with a different architecture (for
+example ARM) cannot start them.
+
+To update, copy the new bundle over this folder, but keep this `.env` (for
+example `rsync -a --exclude .env`), then run `./start.sh` again.
+
 ## Game data
 
 The bundle does not include the `.map` files (1.7 GiB). The services mount
-them read-only from the folder `HALO_MAPS` (`./maps` by default). All users
-must be able to read this folder (`chmod -R a+rX`), because the server runs
-as `nobody`.
+them read-only from the folder `HALO_MAPS` (`./maps` by default). Copy the
+`maps/` folder of the game there once. All users must be able to read this
+folder (`chmod -R a+rX`), because the server runs as `nobody`.
 
 ## Services
 

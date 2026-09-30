@@ -106,6 +106,42 @@ Outside `localhost`, browsers require HTTPS: the game needs cross-origin
 isolation. `HALO_BIND` (`127.0.0.1` by default) is the listen address. Use
 `0.0.0.0` if the reverse proxy runs on a different machine.
 
+### Deploy
+
+1. Copy the bundle, and copy the maps once. In `maps/` next to the bundle,
+   the maps need no change to `.env` (`HALO_MAPS=./maps` is the default):
+
+   ```sh
+   rsync -a dist/halo-web/ server:halo-web/
+   rsync -a assets/maps/ server:halo-web/maps/
+   ```
+
+2. On the server, set `HALO_PUBLIC_ORIGIN` (and `HALO_BIND` if necessary) in
+   `.env`.
+3. On the server, make the maps readable and start the services:
+
+   ```sh
+   chmod -R a+rX maps
+   ./start.sh
+   ```
+
+4. Configure the reverse proxy as given above. The game is then at
+   `HALO_PUBLIC_ORIGIN/build/web/halo.html`.
+
+To update, build and package again, then copy the bundle without the `.env`
+of the server, and start the services again. The maps do not change:
+
+```sh
+./halo-web.sh build && ./halo-web.sh package
+rsync -a --exclude .env dist/halo-web/ server:halo-web/
+ssh server halo-web/start.sh
+```
+
+The Docker images in the bundle are for the architecture of the computer that
+made the bundle (for example x86-64). A server with a different architecture
+(for example ARM) cannot start them. The game files do not depend on the
+architecture.
+
 ## Isolation
 
 The containers run with the minimum privileges:
