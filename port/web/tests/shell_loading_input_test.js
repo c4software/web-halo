@@ -87,10 +87,12 @@ assert.match(shell, /<dt>A<\/dt>[\s\S]*?<dd>- Space<\/dd>[\s\S]*?<dt>B<\/dt>[\s\
   'the high-resolution Duke legend must document the complete keyboard mapping');
 assert.doesNotMatch(shell, /<figcaption>Duke<\/figcaption>/,
   'the controller image must not carry a redundant Duke caption');
-assert.match(shell, /Made by[\s\S]*mitchellhynes\.com[\s\S]*Mitchell Hynes[\s\S]*id="about-open"[\s\S]*Learn more[\s\S]*ko-fi\.com\/mitchellhynes[\s\S]*Buy me a coffee/,
+assert.match(shell, /Made by[\s\S]*mitchellhynes\.com[\s\S]*Mitchell Hynes[\s\S]*id="about-open"[\s\S]*Learn more/,
   'the under-screen row must include the compact creator credit');
-assert.match(shell, /id="about-dialog"[\s\S]*mitchell-jester-card\.svg[\s\S]*github\.com\/bnunu\/halo-ce-universal[\s\S]*github\.com\/cybersecurity\/halo-ce-universal[\s\S]*independently hosted[\s\S]*mitchellhynes\.com[\s\S]*responsible for this website[\s\S]*ko-fi\.com\/mitchellhynes[\s\S]*kofi-support-dark\.png/,
-  'Learn more must disclose sources, independence, support link, and Joker card');
+assert.match(shell, /id="about-dialog"[\s\S]*mitchell-jester-card\.svg[\s\S]*github\.com\/bnunu\/halo-ce-universal[\s\S]*github\.com\/cybersecurity\/halo-ce-universal[\s\S]*independently hosted[\s\S]*mitchellhynes\.com[\s\S]*responsible for this website/,
+  'Learn more must disclose sources, independence, and the Joker card');
+assert.doesNotMatch(shell, /ko-fi|kofi-support|Buy me a coffee/i,
+  'the site must not include Ko-fi links or promotional copy');
 assert.match(shell, /onlineDialog\.open \|\| aboutDialog\.open/,
   'the creator dialog must own keyboard focus instead of controlling Halo');
 assert.match(shell, /addEventListener\("pointerlockchange"/);
