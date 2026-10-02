@@ -891,16 +891,6 @@
         linear-gradient(90deg, rgba(1, 7, 18, .24), transparent 22%, transparent 78%, rgba(1, 7, 18, .24)),
         radial-gradient(circle at 58% 50%, rgba(5, 39, 73, .18), transparent 44%);
     }
-    main::after {
-      content: "";
-      position: absolute;
-      inset: clamp(.7rem, 2vw, 1.4rem);
-      z-index: 4;
-      opacity: .11;
-      background: url("assets/ui/shell/hud-frame.png") center / 100% 100% no-repeat;
-      filter: saturate(.8);
-      pointer-events: none;
-    }
     #game-frame {
       position: absolute;
       left: calc(50% + 7.5rem);
@@ -934,14 +924,7 @@
       max-width: 100%;
       max-height: none;
       aspect-ratio: 16 / 9;
-      border: 1px solid rgba(73, 190, 255, .78);
       background: #02050b;
-      box-shadow:
-        0 0 0 4px rgba(2, 17, 35, .88),
-        0 0 0 5px rgba(28, 156, 237, .45),
-        0 0 2rem rgba(10, 119, 198, .3),
-        0 1.8rem 5rem rgba(0, 0, 0, .64);
-      clip-path: polygon(1.1rem 0, calc(100% - 1.1rem) 0, 100% 1.1rem, 100% calc(100% - 1.1rem), calc(100% - 1.1rem) 100%, 1.1rem 100%, 0 calc(100% - 1.1rem), 0 1.1rem);
       transform: scaleY(-1);
     }
     #campaign-loading {
@@ -1046,9 +1029,6 @@
       max-width: 100%;
       max-height: 100%;
       transform: none;
-    }
-    #game-area:fullscreen #game-frame::before {
-      display: none;
     }
     #game-area:fullscreen canvas.emscripten.ready {
       position: absolute;
@@ -1372,7 +1352,6 @@
         width: min(calc(100% - 1.5rem), calc(177.7778dvh - 7rem));
         max-width: calc(100% - 1.5rem);
       }
-      main::after { inset: .4rem; opacity: .07; }
       dialog { height: auto; overflow: auto; }
       .online-card { grid-template-columns: 1fr; min-height: 0; }
       .profile-panel {

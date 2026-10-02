@@ -34,7 +34,8 @@ assert.match(shell, /.loading-panel \{[\s\S]*?height: 5.25rem;/,
 assert.match(shell, /#loading progress\[hidden\][\s\S]*?visibility: hidden;/,
   'hidden progress must retain its reserved layout slot');
 assert.match(shell, /url\("assets\/ui\/shell\/halo-ce-ring-menu\.jpg"\)/);
-assert.match(shell, /url\("assets\/ui\/shell\/hud-frame\.png"\)/);
+assert.doesNotMatch(shell, /hud-frame\.png/,
+  'the decorative blue HUD frame must not cover the game on constrained devices');
 
 const setStatus = shell.match(/function setStatus\(text\) \{[\s\S]*?\n    \}/);
 assert(setStatus, 'missing setStatus');
@@ -71,8 +72,12 @@ assert.match(shell, /#game-frame footer \{[\s\S]*?background: transparent;/,
   'the controls must not render inside a full-width bottom bar');
 assert.match(shell, /#game-area:fullscreen #game-frame footer \{\s*display: none;/,
   'fullscreen must hide the under-screen control row');
-assert.match(shell, /#game-area:fullscreen #game-frame::before \{\s*display: none;/,
-  'fullscreen must hide the decorative website HUD overlay');
+assert.doesNotMatch(shell, /main::after \{[\s\S]*?hud-frame\.png/,
+  'the decorative website HUD overlay must be removed in every display mode');
+const readyCanvasStyle = shell.match(/#game-frame canvas\.emscripten\.ready \{[\s\S]*?\n    \}/);
+assert(readyCanvasStyle, 'missing ready game canvas styling');
+assert.doesNotMatch(readyCanvasStyle[0], /border:|box-shadow:|clip-path:/,
+  'the game canvas must not carry a decorative blue sci-fi frame');
 assert.match(shell,
   /#game-area:fullscreen #player-sidebar,\s*#game-area:fullscreen #duke-legend \{ display: none; \}/,
   'fullscreen must hide the online sidebar and Duke legend');
