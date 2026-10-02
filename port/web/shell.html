@@ -6,7 +6,6 @@
   <meta name="color-scheme" content="dark">
   <meta name="halo-signaling-url" content="https://halo-web-signaling.otherness-bugs.workers.dev">
   <meta name="halo-build-id" content="web-multiplayer-v1">
-  <meta name="halo-legacy-map-url" content="">
   <meta name="halo-turnstile-sitekey" content="0x4AAAAAAFJKYJ-u47UliqDs">
   <script src="coi-serviceworker.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
@@ -1852,7 +1851,6 @@
     let playerInputMode = "keyboard-mouse";
     let releaseXisoDependency = null;
     let xisoInstallActive = false;
-    let xisoTypedPhrase = "";
     const runtimeMapNames = [
       "a10", "a30", "a50", "b30", "b40", "c10", "c20", "c40", "d20", "d40",
       "beavercreek", "bloodgulch", "boardingaction", "carousel", "chillout", "damnation",
@@ -1951,43 +1949,12 @@
       }
     }
 
-    function activateLegacyBrowserFlow() {
-      if (!xisoDialog.open || !releaseXisoDependency || xisoInstallActive) return;
-      const meta = document.querySelector('meta[name="halo-legacy-map-url"]');
-      const legacyMapUrl = meta && meta.content ? meta.content.trim() : "";
-      if (!legacyMapUrl) {
-        xisoStatus.dataset.state = "error";
-        xisoStatus.textContent = "The legacy browser flow is not configured in this public build.";
-        return;
-      }
-      Module.haloMapBaseUrl = legacyMapUrl;
-      xisoStatus.dataset.state = "ready";
-      xisoStatus.textContent = "Switching to the legacy browser flow…";
-      finishXisoGate();
-    }
-
     xisoChooseButton.addEventListener("click", () => xisoFileInput.click());
     xisoFileInput.addEventListener("change", () => installSelectedXiso(xisoFileInput.files[0]));
     xisoDialog.addEventListener("cancel", event => event.preventDefault());
     xisoDialog.addEventListener("close", () => {
       if (releaseXisoDependency) showXisoGate("Choose your Halo XISO to continue.");
     });
-    xisoDialog.addEventListener("keydown", event => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === "Backspace") {
-        xisoTypedPhrase = xisoTypedPhrase.slice(0, -1);
-        event.preventDefault();
-        return;
-      }
-      if (event.key.length !== 1) return;
-      xisoTypedPhrase = `${xisoTypedPhrase}${event.key.toLowerCase()}`.slice(-10);
-      event.preventDefault();
-      if (xisoTypedPhrase === "i am mitch") {
-        xisoTypedPhrase = "";
-        activateLegacyBrowserFlow();
-      }
-    });
-
     function percentile(values, fraction) {
       const sorted = [...values].sort((left, right) => left - right);
       return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * fraction) - 1))];

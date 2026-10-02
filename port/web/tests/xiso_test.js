@@ -15,8 +15,8 @@ assert.match(shell, /id="xiso-dialog"[\s\S]*comply with copyright law[\s\S]*does
   'the first-run gate must explain the lawful local-disc requirement');
 assert.doesNotMatch(shell, /Your game · your device|The XISO never leaves this device/,
   'the first-run gate must stay compact');
-assert.match(shell, /xisoTypedPhrase === "i am mitch"[\s\S]*activateLegacyBrowserFlow/,
-  'the requested typed legacy-flow switch must remain wired');
+assert.doesNotMatch(shell, /i am mitch|activateLegacyBrowserFlow|halo-legacy-map-url/,
+  'the public XISO gate must not contain a hidden legacy-flow bypass');
 assert.match(buildRules, /--pre-js \{WEB_DIR\}\/xiso\.js/,
   'the XISO reader must run in the window and FetchFS workers');
 assert.doesNotMatch(stage, /checked_copy\(maps|MULTIPLAYER_MAPS/,
