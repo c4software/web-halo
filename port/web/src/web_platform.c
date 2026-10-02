@@ -117,7 +117,9 @@ void platform_web_initialize(void)
 	 * script instead; scriptDirectory is correct in both the window and the
 	 * pthread worker that initializes this backend. */
 	maps_url = (char *)EM_ASM_PTR({
-		return stringToNewUTF8(new URL("assets/maps", scriptDirectory).href);
+		const configured = typeof Module === "object" && Module.haloMapBaseUrl;
+		const local = new URL("assets/maps", scriptDirectory).href;
+		return stringToNewUTF8(configured ? new URL(configured, scriptDirectory).href : local);
 	});
 	platform_log("web: map source: %s", maps_url);
 	maps = wasmfs_create_fetch_backend(maps_url, 32 * 1024 * 1024);

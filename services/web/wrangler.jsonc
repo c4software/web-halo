@@ -10,12 +10,6 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "none"
   },
-  "r2_buckets": [
-    {
-      "binding": "CAMPAIGN_MAPS",
-      "bucket_name": "halo-web-campaign-maps"
-    }
-  ],
   "analytics_engine_datasets": [
     {
       "binding": "PERFORMANCE_TELEMETRY",

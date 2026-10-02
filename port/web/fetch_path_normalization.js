@@ -31,10 +31,21 @@
       isMapRequest = canonicalPath.includes("/assets/maps/");
     }
 
-    const response = await nativeFetch(resource, options);
     const method = String(
       options && options.method || resource instanceof Request && resource.method || "GET"
     ).toUpperCase();
+
+    /* The public build keeps copyrighted game data on the player's device.
+     * Resolve FetchFS's normal HTTP-style requests from the validated OPFS
+     * installation first; a separately configured legacy build can still
+     * fall through to an HTTP map source. */
+    if (isMapRequest && scope.HaloXiso &&
+        typeof scope.HaloXiso.responseForMapRequest === "function") {
+      const localResponse = await scope.HaloXiso.responseForMapRequest(resource, options);
+      if (localResponse) return localResponse;
+    }
+
+    const response = await nativeFetch(resource, options);
 
     /* CloudFront serves byte ranges for these objects but does not include
      * Accept-Ranges on its HEAD response. FetchFS interprets that omission as

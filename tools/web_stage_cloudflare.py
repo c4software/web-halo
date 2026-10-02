@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Stage the browser build and multiplayer maps for Cloudflare Assets.
+"""Stage the browser runtime without copyrighted Halo game data.
 
-Campaign maps exceed the Static Assets per-file limit. The hosting Worker
-streams those maps from the R2 bucket configured in services/web/wrangler.jsonc.
+Players select an XISO made from their own Xbox disc. The browser validates it
+and keeps the required maps in origin-private local storage; no map files are
+copied into the deployable asset tree.
 """
 
 from __future__ import annotations
@@ -15,22 +16,6 @@ from pathlib import Path
 
 
 MAX_ASSET_BYTES = 25 * 1024 * 1024
-MULTIPLAYER_MAPS = (
-    "beavercreek.map",
-    "bloodgulch.map",
-    "boardingaction.map",
-    "carousel.map",
-    "chillout.map",
-    "damnation.map",
-    "hangemhigh.map",
-    "longest.map",
-    "prisoner.map",
-    "putput.map",
-    "ratrace.map",
-    "sidewinder.map",
-    "wizard.map",
-)
-
 HEADERS = """/*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
@@ -38,9 +23,6 @@ HEADERS = """/*
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Cache-Control: public, max-age=0, must-revalidate
-
-/assets/maps/*
-  Content-Type: application/octet-stream
 """
 
 BUILD_META_PATTERN = re.compile(
@@ -87,7 +69,6 @@ def stamp_build_id(path: Path, build_id: str) -> None:
 def main() -> int:
     repository = Path(__file__).resolve().parents[1]
     web_build = repository / "build" / "web"
-    maps = repository / "assets" / "maps"
     output = repository / "build" / "cloudflare-web"
 
     if output.exists():
@@ -113,9 +94,6 @@ def main() -> int:
     total += checked_copy(web_build / "halo.html", output / "index.html")
     stamp_build_id(output / "halo.html", build_id)
     stamp_build_id(output / "index.html", build_id)
-
-    for name in ("ui.map", *MULTIPLAYER_MAPS):
-        total += checked_copy(maps / name, output / "assets" / "maps" / name)
 
     ui_assets = repository / "port" / "web" / "assets" / "ui"
     if not ui_assets.is_dir():

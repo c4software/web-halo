@@ -41,9 +41,10 @@ an older build from that page.
 
 ## Game data
 
-The port does not include the game data. Download an Xbox disc image
-(`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
-operate.
+The port does not include the game data. Make an Xbox disc image (`.xiso` or
+`.iso`) from your own copy of Halo: Combat Evolved. All versions of the game
+operate. For disc-ripping instructions, visit
+[discord.gg/DQRgPUq6B8](https://discord.gg/DQRgPUq6B8).
 
 On Linux and Windows:
 
@@ -63,8 +64,11 @@ On Android:
 
 The public multiplayer build is available at
 [mitchellhynes.com/halo](https://mitchellhynes.com/halo).
-It includes the stock multiplayer maps. Campaign missions are streamed in
-chunks from the deployment's private R2 game-data bucket.
+To comply with copyright law and respect the original Halo CE decompilation team, the site
+does not host or transmit Halo game data. On first use, choose an XISO made from
+your own Xbox copy. The browser validates it locally, copies only the required
+maps to origin-private storage in small chunks, and then reads those local files
+on demand. The XISO never leaves your device.
 
 To play with friends:
 
@@ -76,9 +80,10 @@ To play with friends:
 Audio starts muted. Everyone needs a current desktop browser with WebGL 2,
 WebAssembly threads, WebRTC, and cross-origin isolation support.
 
-The signaling Worker deploys from GitHub Actions after its tests pass. The
-browser executable and game data are deliberately excluded from Git history;
-they are built and deployed from an entitled local copy of the game. See
+The signaling Worker deploys from GitHub Actions after its tests pass. Generated
+browser executables and game data are deliberately excluded from Git history;
+the executable is built by the deployment pipeline and each player supplies
+their own local game data. See
 [docs/telemetry.md](docs/telemetry.md) for performance and TURN operations.
 
 ### Build the browser version on macOS

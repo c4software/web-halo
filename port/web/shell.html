@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="halo-signaling-url" content="https://halo-web-signaling.otherness-bugs.workers.dev">
   <meta name="halo-build-id" content="web-multiplayer-v1">
+  <meta name="halo-legacy-map-url" content="">
   <meta name="halo-turnstile-sitekey" content="0x4AAAAAAFJKYJ-u47UliqDs">
   <script src="coi-serviceworker.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
@@ -1266,6 +1267,40 @@
     progress::-webkit-progress-value { background: linear-gradient(90deg, #076fbc, #70d9ff); box-shadow: 0 0 .6rem rgba(72, 195, 255, .65); }
     progress::-moz-progress-bar { background: linear-gradient(90deg, #076fbc, #70d9ff); }
 
+    #xiso-dialog {
+      width: min(26rem, calc(100% - 1.25rem));
+      height: min(19rem, calc(100% - 1.25rem));
+      min-height: 0;
+      max-height: calc(100% - 2rem);
+      padding: 0;
+      overflow: auto;
+    }
+    .xiso-card {
+      display: grid;
+      gap: .72rem;
+      padding: clamp(1rem, 3vw, 1.35rem);
+    }
+    .xiso-card h1 {
+      margin: 0;
+      color: #e4f4ff;
+      font-size: clamp(1.15rem, 4vw, 1.4rem);
+      line-height: 1.1;
+    }
+    .xiso-card p { margin: 0; color: #aac0ce; font-size: .75rem; line-height: 1.45; }
+    .xiso-card a { color: #79d1ff; text-underline-offset: .16em; }
+    .xiso-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+    #xiso-file { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    #xiso-progress {
+      width: 100%;
+      height: .36rem;
+      border: 0;
+      accent-color: #39bfff;
+    }
+    #xiso-progress[hidden] { display: none; }
+    #xiso-status { min-height: 1.3rem; color: #bcd4e3; }
+    #xiso-status[data-state="error"] { color: #ffd0c7; }
+    #xiso-status[data-state="ready"] { color: #a8f1ca; }
+
     #diagnostics-overlay,
     dialog {
       border-color: rgba(41, 167, 246, .66);
@@ -1552,6 +1587,20 @@
       <p class="diagnostics-shortcut">⌘/Ctrl + Shift + L</p>
     </section>
   </main>
+  <dialog id="xiso-dialog" aria-labelledby="xiso-title" aria-describedby="xiso-description" tabindex="-1">
+    <section class="xiso-card">
+      <h1 id="xiso-title">Choose your Halo XISO</h1>
+      <p id="xiso-description">To comply with copyright law and respect the original Halo CE decompilation team, this website does not provide Halo game data. Choose an XISO made from your own Xbox copy of <cite>Halo: Combat Evolved</cite>.</p>
+      <p>Need help making one? Visit <a href="https://discord.gg/DQRgPUq6B8" target="_blank" rel="noopener noreferrer">discord.gg/DQRgPUq6B8</a> for instructions on ripping your own disc.</p>
+      <input id="xiso-file" type="file" accept=".iso,.xiso,application/octet-stream" aria-label="Choose Halo XISO">
+      <div class="xiso-actions">
+        <button id="xiso-choose" class="primary" type="button">Choose XISO</button>
+        <span id="xiso-file-name" aria-live="polite"></span>
+      </div>
+      <progress id="xiso-progress" value="0" max="1" hidden></progress>
+      <p id="xiso-status" role="status" aria-live="polite">Waiting for your disc image.</p>
+    </section>
+  </dialog>
   <dialog id="about-dialog" aria-labelledby="about-title">
     <article class="about-card">
       <button id="about-close" class="icon-button" type="button" aria-label="Close">✕</button>
@@ -1758,6 +1807,12 @@
     const aboutButton = document.getElementById("about-open");
     const aboutDialog = document.getElementById("about-dialog");
     const aboutCloseButton = document.getElementById("about-close");
+    const xisoDialog = document.getElementById("xiso-dialog");
+    const xisoFileInput = document.getElementById("xiso-file");
+    const xisoChooseButton = document.getElementById("xiso-choose");
+    const xisoFileName = document.getElementById("xiso-file-name");
+    const xisoProgress = document.getElementById("xiso-progress");
+    const xisoStatus = document.getElementById("xiso-status");
     const onlineDialog = document.getElementById("online-dialog");
     const gameSettingsMenu = document.getElementById("game-settings-menu");
     const disablePlayerMagnetism = document.getElementById("disable-player-magnetism");
@@ -1795,6 +1850,9 @@
     let gamepadDiscoveryFailed = false;
     let playerMagnetismManual = false;
     let playerInputMode = "keyboard-mouse";
+    let releaseXisoDependency = null;
+    let xisoInstallActive = false;
+    let xisoTypedPhrase = "";
     const runtimeMapNames = [
       "a10", "a30", "a50", "b30", "b40", "c10", "c20", "c40", "d20", "d40",
       "beavercreek", "bloodgulch", "boardingaction", "carousel", "chillout", "damnation",
@@ -1815,6 +1873,120 @@
     let campaignLoad = null;
     const performanceMinimumWindow = 750;
     const performanceMaximumWindow = 2500;
+
+    function showXisoGate(message = "Waiting for your disc image.") {
+      xisoStatus.dataset.state = "waiting";
+      xisoStatus.textContent = message;
+      if (!xisoDialog.open) xisoDialog.showModal();
+      try { xisoDialog.focus({ preventScroll: true }); } catch (_error) { xisoDialog.focus(); }
+    }
+
+    function finishXisoGate() {
+      if (!releaseXisoDependency) return;
+      const release = releaseXisoDependency;
+      releaseXisoDependency = null;
+      if (xisoDialog.open) xisoDialog.close();
+      setStatus("Starting Halo…");
+      release();
+    }
+
+    async function beginXisoGate() {
+      addRunDependency("halo-xiso");
+      let released = false;
+      releaseXisoDependency = () => {
+        if (released) return;
+        released = true;
+        removeRunDependency("halo-xiso");
+      };
+      try {
+        if (!globalThis.HaloXiso) {
+          throw new Error("The local XISO reader did not load.");
+        }
+        if (await globalThis.HaloXiso.isInstalled()) {
+          finishXisoGate();
+          return;
+        }
+        showXisoGate();
+      } catch (error) {
+        showXisoGate(error && error.message ? error.message : "Local game storage is unavailable.");
+        xisoStatus.dataset.state = "error";
+      }
+    }
+
+    async function installSelectedXiso(file) {
+      if (!file || xisoInstallActive || !globalThis.HaloXiso) return;
+      xisoInstallActive = true;
+      xisoChooseButton.disabled = true;
+      xisoChooseButton.textContent = "Reading XISO…";
+      xisoFileName.textContent = file.name;
+      xisoProgress.hidden = true;
+      xisoStatus.dataset.state = "working";
+      try {
+        await globalThis.HaloXiso.install(file, progress => {
+          if (progress.phase === "catalog") {
+            xisoStatus.textContent = progress.message;
+            return;
+          }
+          if (progress.phase === "copy") {
+            xisoProgress.hidden = false;
+            xisoProgress.max = progress.totalBytes;
+            xisoProgress.value = progress.completedBytes;
+            const percent = Math.floor(progress.completedBytes * 100 / progress.totalBytes);
+            xisoStatus.textContent = `Preparing local game data… ${percent}% · ${progress.name}`;
+          }
+        });
+        xisoStatus.dataset.state = "ready";
+        xisoStatus.textContent = "Game data is ready. Starting Halo…";
+        finishXisoGate();
+      } catch (error) {
+        xisoStatus.dataset.state = "error";
+        xisoStatus.textContent = error && error.message
+          ? error.message
+          : "That XISO could not be read. Choose your Halo Xbox disc image and try again.";
+        xisoChooseButton.disabled = false;
+        xisoChooseButton.textContent = "Choose another XISO";
+        xisoFileInput.value = "";
+      } finally {
+        xisoInstallActive = false;
+      }
+    }
+
+    function activateLegacyBrowserFlow() {
+      if (!xisoDialog.open || !releaseXisoDependency || xisoInstallActive) return;
+      const meta = document.querySelector('meta[name="halo-legacy-map-url"]');
+      const legacyMapUrl = meta && meta.content ? meta.content.trim() : "";
+      if (!legacyMapUrl) {
+        xisoStatus.dataset.state = "error";
+        xisoStatus.textContent = "The legacy browser flow is not configured in this public build.";
+        return;
+      }
+      Module.haloMapBaseUrl = legacyMapUrl;
+      xisoStatus.dataset.state = "ready";
+      xisoStatus.textContent = "Switching to the legacy browser flow…";
+      finishXisoGate();
+    }
+
+    xisoChooseButton.addEventListener("click", () => xisoFileInput.click());
+    xisoFileInput.addEventListener("change", () => installSelectedXiso(xisoFileInput.files[0]));
+    xisoDialog.addEventListener("cancel", event => event.preventDefault());
+    xisoDialog.addEventListener("close", () => {
+      if (releaseXisoDependency) showXisoGate("Choose your Halo XISO to continue.");
+    });
+    xisoDialog.addEventListener("keydown", event => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "Backspace") {
+        xisoTypedPhrase = xisoTypedPhrase.slice(0, -1);
+        event.preventDefault();
+        return;
+      }
+      if (event.key.length !== 1) return;
+      xisoTypedPhrase = `${xisoTypedPhrase}${event.key.toLowerCase()}`.slice(-10);
+      event.preventDefault();
+      if (xisoTypedPhrase === "i am mitch") {
+        xisoTypedPhrase = "";
+        activateLegacyBrowserFlow();
+      }
+    });
 
     function percentile(values, fraction) {
       const sorted = [...values].sort((left, right) => left - right);
@@ -2641,7 +2813,8 @@
 
     function webUiOwnsKeyboardFocus() {
       const active = document.activeElement;
-      if (!diagnosticsOverlay.hidden || onlineDialog.open || aboutDialog.open || gameSettingsMenu.open) return true;
+      if (!diagnosticsOverlay.hidden || onlineDialog.open || aboutDialog.open ||
+          xisoDialog.open || gameSettingsMenu.open) return true;
       return active && active !== canvas && typeof active.matches === "function" &&
         active.matches("input, select, textarea, button, summary, [contenteditable='true']");
     }
@@ -2834,6 +3007,7 @@
 
     var Module = {
       canvas,
+      preRun: [beginXisoGate],
       print: (...args) => {
         const line = args.join(" ");
         const performancePrefix = "HALO_PERF:";
