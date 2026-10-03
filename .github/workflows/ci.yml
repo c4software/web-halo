@@ -37,3 +37,14 @@ jobs:
         run: node --check services/web/src/index.js
       - name: Validate operations CLI syntax
         run: node --check tools/halo_telemetry.mjs
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          components: clippy,rustfmt
+      - name: Check native-link gateway
+        working-directory: services/native-gateway
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
