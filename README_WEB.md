@@ -19,7 +19,9 @@ machine without a rebuild.
 - The repository is mounted at `/src`. `build/` stays on the computer.
 - The containers run with the UID and GID of the user (1000:1000 by default;
   set `HOST_UID` and `HOST_GID` to change them). Thus root does not own this
-  folder.
+  folder. With rootless Docker, root in a container is the user on the
+  computer: `halo-web.sh` then uses 0:0. For the manual commands, set
+  `HOST_UID=0` and `HOST_GID=0`.
 - The Emscripten cache is kept in the `emscripten-cache` volume. The first
   link downloads and compiles SDL3 (3.4.16, `port/web/halo_sdl3.py`). Later
   links use the cache.

@@ -34,8 +34,15 @@ EOF
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$repository"
 
-export HOST_UID=${HOST_UID:-$(id -u)}
-export HOST_GID=${HOST_GID:-$(id -g)}
+# The containers run as the host user, so that this user owns build/. With
+# rootless Docker, root in a container is the host user.
+if docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+    export HOST_UID=${HOST_UID:-0}
+    export HOST_GID=${HOST_GID:-0}
+else
+    export HOST_UID=${HOST_UID:-$(id -u)}
+    export HOST_GID=${HOST_GID:-$(id -g)}
+fi
 
 # The bundle's files (compose.yaml, env.example, start.sh, README.md).
 BUNDLE_DIR=docker/bundle
