@@ -20,6 +20,8 @@
     "TURN_GLOBAL_DAILY_EGRESS_CAP_BYTES": "10000000000",
     "DEFAULT_ROOM_CAPACITY": "128",
     "MAX_ROOM_CAPACITY": "128"
+    // Set NATIVE_GATEWAY_CONTROL_URL after the separately isolated native
+    // gateway is deployed. NATIVE_GATEWAY_SECRET is a Wrangler secret.
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
