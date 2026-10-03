@@ -16,11 +16,10 @@ machine without a rebuild.
 | `docker/signaling/` | The image of the signaling service (`services/signaling`), run with `wrangler dev`. |
 | `docker/bundle/` | The files of the bundle: `compose.yaml`, `env.example`, `start.sh`, `README.md`. |
 
-- The repository is mounted at `/src`. `build/` and `assets/` stay on the
-  computer.
+- The repository is mounted at `/src`. `build/` stays on the computer.
 - The containers run with the UID and GID of the user (1000:1000 by default;
-  set `HOST_UID` and `HOST_GID` to change them). Thus root does not own these
-  folders.
+  set `HOST_UID` and `HOST_GID` to change them). Thus root does not own this
+  folder.
 - The Emscripten cache is kept in the `emscripten-cache` volume. The first
   link downloads and compiles SDL3 (3.4.16, `port/web/halo_sdl3.py`). Later
   links use the cache.
@@ -31,7 +30,7 @@ machine without a rebuild.
 
 ```sh
 ./halo-web.sh                     # build, then serve locally
-./halo-web.sh build [--iso IMAGE] # extract the maps if necessary, and build
+./halo-web.sh build               # build the browser version
 ./halo-web.sh serve               # serve the game and the signaling service
 ./halo-web.sh stop                # stop the local services
 ./halo-web.sh package [--url https://halo.example.lan] [--output DIR]
@@ -40,18 +39,26 @@ machine without a rebuild.
 `build` does these steps:
 
 1. It builds the Docker image.
-2. If `assets/maps` does not exist, it extracts `maps/` from the disc image.
-   The disc image is `--iso`, or else the only `.iso` in the repository root.
-3. If `build.ninja` does not have the release web target, it runs
+2. If `build.ninja` does not have the release web target, it runs
    `configure.py --release --pgo=off --lto=off`, as `tools/web_run.py` does.
-4. It runs `ninja web`.
-5. It points the page at the local signaling service.
+3. It runs `ninja web`.
+4. It points the page at the local signaling service.
+5. It copies `port/web/coi-serviceworker.js` next to the page, which loads it.
 
 `serve` then serves the game at
 <http://127.0.0.1:8765/build/web/halo.html>. The server sends the COOP and
 COEP headers that WebAssembly threads need. Use a current desktop browser with
 WebGL 2, WebAssembly threads and cross-origin isolation. Chrome is
 recommended.
+
+## Game data
+
+The build does not include game data, and the servers do not serve it. On
+first use, the page asks each player for an Xbox disc image (`.xiso` or
+`.iso`) made from their own copy of Halo: Combat Evolved. The browser copies
+the maps to its origin-private storage and reads them from there. The disc
+image never leaves the player's device. Thus `halo-web.sh` does not extract
+the maps, and the bundle does not mount them.
 
 ## Local multiplayer
 
@@ -82,15 +89,12 @@ All services run on the computer. No Cloudflare service is necessary.
 to the target machine. The target needs only Docker with Compose; it does not
 compile anything.
 
-- `www/`: `halo.html`, `halo.js`, `halo.wasm` and the UI images.
+- `www/`: `halo.html`, `halo.js`, `halo.wasm`, `coi-serviceworker.js` and
+  the UI images.
 - `images.tar.gz`: the Docker images `halo-signaling` and `python:3.12-slim`.
   `start.sh` loads them, so the target does not need Internet access.
 - `compose.yaml`, `start.sh` and `README.md`, from `docker/bundle/`, and
   `.env`, from `docker/bundle/env.example`.
-
-The bundle does not include the maps. The target mounts them read-only from
-the folder `HALO_MAPS` in `.env`. All users must be able to read this folder
-(`chmod -R a+rX`), because the server runs as `nobody`.
 
 `HALO_PUBLIC_ORIGIN` in `.env` selects one of two uses:
 
@@ -108,20 +112,17 @@ isolation. `HALO_BIND` (`127.0.0.1` by default) is the listen address. Use
 
 ### Deploy
 
-1. Copy the bundle, and copy the maps once. In `maps/` next to the bundle,
-   the maps need no change to `.env` (`HALO_MAPS=./maps` is the default):
+1. Copy the bundle:
 
    ```sh
    rsync -a dist/halo-web/ server:halo-web/
-   rsync -a assets/maps/ server:halo-web/maps/
    ```
 
 2. On the server, set `HALO_PUBLIC_ORIGIN` (and `HALO_BIND` if necessary) in
    `.env`.
-3. On the server, make the maps readable and start the services:
+3. On the server, start the services:
 
    ```sh
-   chmod -R a+rX maps
    ./start.sh
    ```
 
@@ -129,7 +130,7 @@ isolation. `HALO_BIND` (`127.0.0.1` by default) is the listen address. Use
    `HALO_PUBLIC_ORIGIN/build/web/halo.html`.
 
 To update, build and package again, then copy the bundle without the `.env`
-of the server, and start the services again. The maps do not change:
+of the server, and start the services again:
 
 ```sh
 ./halo-web.sh build && ./halo-web.sh package
@@ -156,21 +157,21 @@ The containers run with the minimum privileges:
 - no Docker socket, and the default seccomp profile.
 
 The `web` service keeps network access, because the first link downloads
-SDL3. It can write to the repository (`build/`, `assets/`, `build.ninja`).
+SDL3. It can write to the repository (`build/`, `build.ninja`).
 
 ## Manual use
 
 From the repository root:
 
 ```sh
-# 1. Extract maps/ from a complete Xbox disc image
-docker compose run --rm web python3 tools/xiso_extract.py Halo.iso --output assets/maps
-
-# 2. Configure and build (the same options as tools/web_run.py)
+# 1. Configure and build (the same options as tools/web_run.py)
 docker compose run --rm web sh -c 'python3 configure.py --release --pgo=off --lto=off && ninja web'
 
-# 3. Use the local signaling service
+# 2. Use the local signaling service
 docker compose run --rm web python3 docker/web/localize_page.py
+
+# 3. Copy the script that the page loads from its own folder
+cp port/web/coi-serviceworker.js build/web/
 
 # 4. Serve the game and the signaling service
 docker compose up serve signaling
@@ -187,7 +188,3 @@ docker compose up serve signaling
   build needs the folder. If the folder does not exist, `halo-web.sh` makes it
   empty. The menu then shows broken images; the game does not need them. The
   `assets/` pattern of `.gitignore` excludes this folder.
-- `port/web/src/web_platform.c` calls `game_map_loading_name()`, but no file
-  defined it, so the link failed. `source/game/game.c` now defines it for the
-  browser build (`HALO_WEB`). It gives the base name of the map that is
-  loading (for example `a10`), for the loading progress.

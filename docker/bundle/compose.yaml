@@ -16,7 +16,6 @@ services:
     volumes:
       - ./web_serve.py:/app/web_serve.py:ro
       - ./www:/srv:ro
-      - ${HALO_MAPS:-./maps}:/srv/assets/maps:ro
     ports:
       - "${HALO_BIND:-127.0.0.1}:${HALO_WEB_PORT:-8765}:8765"
 

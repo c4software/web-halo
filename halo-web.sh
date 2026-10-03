@@ -10,25 +10,24 @@ usage() {
 Usage: ./halo-web.sh [command] [options]
 
 Commands:
-  all [--iso IMAGE]     build, then serve (the default)
-  build [--iso IMAGE]   extract maps/ if needed and build the browser version
+  all                   build, then serve (the default)
+  build                 build the browser version
   serve                 serve the game and the signaling service locally
                         (http://127.0.0.1:8765/build/web/halo.html)
   stop                  stop the local services
   package [--url ORIGIN] [--output DIR]
                         make a bundle to run on another machine without
-                        rebuilding (default output: dist/halo-web); the game
-                        data is not included, the target mounts it
+                        rebuilding (default output: dist/halo-web)
                         --url ORIGIN: public address given by your reverse
                         proxy (e.g. https://halo.example.lan), written to
                         the bundle's .env; without it, the game is used at
                         http://127.0.0.1:8765 on the target itself
 
 Options:
-  --iso IMAGE           Xbox disc image to extract maps/ from (default: the
-                        only .iso in the repository root, when assets/maps
-                        is absent)
   -h, --help            show this help
+
+No game data is built in or served: on first use, each player chooses an
+XISO of their own copy of Halo in the browser, which keeps the maps locally.
 EOF
 }
 
@@ -54,40 +53,9 @@ fail() {
 
 # --- build -------------------------------------------------------------------
 
-extract_maps() {
-    local iso=$1 iso_path container_iso
-    local -a mount=()
-
-    [ -f assets/maps/ui.map ] && return
-    if [ -z "$iso" ]; then
-        shopt -s nullglob
-        local -a images=(*.iso *.xiso)
-        shopt -u nullglob
-        [ ${#images[@]} -eq 1 ] || fail "assets/maps is missing; pass --iso /path/to/Halo.iso"
-        iso=${images[0]}
-    fi
-    [ -f "$iso" ] || fail "disc image does not exist: $iso"
-
-    # The repository is mounted at /src; an image outside it is mounted apart.
-    iso_path=$(realpath "$iso")
-    case "$iso_path" in
-        "$repository"/*) container_iso="/src/${iso_path#"$repository"/}" ;;
-        *)
-            container_iso="/iso/$(basename "$iso_path")"
-            mount=(-v "$iso_path:$container_iso:ro")
-            ;;
-    esac
-    echo "==> Extracting maps/ from $iso"
-    compose run --rm "${mount[@]}" web \
-        python3 tools/xiso_extract.py "$container_iso" --output assets/maps
-}
-
 build() {
-    local iso=$1
-
     echo "==> Build image"
     compose build web
-    extract_maps "$iso"
 
     # The web UI images (port/web/assets) are not published with the
     # sources, but the build needs the folder: without them the menu shows
@@ -111,11 +79,14 @@ build() {
     # Cloudflare services, and loads no Turnstile script.
     echo "==> Pointing the page at the local signaling service"
     compose run --rm web python3 docker/web/localize_page.py build/web/halo.html
+
+    # The page loads this script from its own folder (port/web/shell.html).
+    cp port/web/coi-serviceworker.js build/web/
 }
 
 require_build() {
     local output
-    for output in halo.html halo.js halo.wasm; do
+    for output in halo.html halo.js halo.wasm coi-serviceworker.js; do
         [ -f "build/web/$output" ] || fail "no browser build (build/web/$output); run ./halo-web.sh build"
     done
 }
@@ -124,7 +95,6 @@ require_build() {
 
 serve() {
     require_build
-    [ -f assets/maps/ui.map ] || fail "no game data (assets/maps); run ./halo-web.sh build"
     echo "==> Serving on http://127.0.0.1:8765/build/web/halo.html (Ctrl-C to stop)"
     compose up --build serve signaling
 }
@@ -145,12 +115,11 @@ package() {
         echo "==> Replacing $output"
         rm -rf "$output"
     fi
-    # maps/ (1.7 GiB) is not copied: the target mounts it as a volume
-    # (HALO_MAPS in .env), at this empty mount point.
-    mkdir -p "$www/build/web" "$www/assets/maps"
+    mkdir -p "$www/build/web"
 
     echo "==> Game files"
-    cp -a build/web/halo.html build/web/halo.js build/web/halo.wasm "$www/build/web/"
+    cp -a build/web/halo.html build/web/halo.js build/web/halo.wasm \
+        build/web/coi-serviceworker.js "$www/build/web/"
     [ -d build/web/assets ] && cp -a build/web/assets "$www/build/web/"
     cp -a tools/web_serve.py "$output/"
     # The bundle's server runs as nobody.
@@ -170,7 +139,7 @@ package() {
 
     echo "==> Bundle ready: $output ($(du -sh "$output" | cut -f1))"
     echo "    Copy it to the target machine (e.g. rsync -a $output/ target:halo-web/),"
-    echo "    set HALO_MAPS in its .env, then run ./start.sh there."
+    echo "    then run ./start.sh there."
 }
 
 # --- command line ------------------------------------------------------------
@@ -181,12 +150,10 @@ case "${1:-}" in
     -h|--help) usage; exit 0 ;;
 esac
 
-iso=""
 url=""
 output="dist/halo-web"
 while [ $# -gt 0 ]; do
     case "$1" in
-        --iso) iso=${2:?--iso needs a path}; shift 2 ;;
         --url) url=${2:?--url needs an address}; shift 2 ;;
         --output) output=${2:?--output needs a directory}; shift 2 ;;
         -h|--help) usage; exit 0 ;;
@@ -195,8 +162,8 @@ while [ $# -gt 0 ]; do
 done
 
 case "$command" in
-    all) build "$iso"; serve ;;
-    build) build "$iso" ;;
+    all) build; serve ;;
+    build) build ;;
     serve) serve ;;
     stop) compose down ;;
     package) package "$url" "$output" ;;

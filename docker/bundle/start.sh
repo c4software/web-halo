@@ -3,12 +3,6 @@
 # the services in the background. Stop them with: docker compose down
 set -eu
 cd "$(dirname "$0")"
-maps=$(sed -n 's/^HALO_MAPS=//p' .env)
-maps=${maps:-./maps}
-if [ ! -f "$maps/ui.map" ]; then
-    echo "start.sh: no game data in $maps (ui.map missing); set HALO_MAPS in .env" >&2
-    exit 1
-fi
 echo "==> Loading Docker images"
 gunzip -c images.tar.gz | docker load
 docker compose up -d

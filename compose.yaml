@@ -1,6 +1,5 @@
 # Browser build environment. Usage (from the repository root):
 #
-#   docker compose run --rm web python3 tools/xiso_extract.py "<image>.iso" --output assets/maps
 #   docker compose run --rm web sh -c 'python3 configure.py --release --pgo=off --lto=off && ninja web'
 #   docker compose up serve signaling   # http://127.0.0.1:8765/build/web/halo.html
 #

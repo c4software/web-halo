@@ -20,10 +20,10 @@ example `rsync -a --exclude .env`), then run `./start.sh` again.
 
 ## Game data
 
-The bundle does not include the `.map` files (1.7 GiB). The services mount
-them read-only from the folder `HALO_MAPS` (`./maps` by default). Copy the
-`maps/` folder of the game there once. All users must be able to read this
-folder (`chmod -R a+rX`), because the server runs as `nobody`.
+The bundle does not include or serve game data. On first use, each player
+chooses an Xbox disc image (`.xiso` or `.iso`) made from their own copy of
+Halo: Combat Evolved. The browser copies the maps to its own local storage
+and reads them from there. The disc image never leaves the player's device.
 
 ## Services
 
@@ -51,8 +51,7 @@ isolation (WebAssembly threads). Put the public address in
 - send all other paths to the `web` service;
 - keep the original `Host` header;
 - keep the `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy`
-  headers of the `web` service, and let `Range` requests through (do not
-  compress the `.map` files).
+  headers of the `web` service.
 
 The game is then at `HALO_PUBLIC_ORIGIN/build/web/halo.html`.
 
