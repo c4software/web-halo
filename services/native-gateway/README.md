@@ -24,8 +24,10 @@ link-local, multicast, benchmark, and documentation ranges are rejected.
 
 Required:
 
-- `CONTROL_SECRET`: at least 32 characters; identical to the Worker's
-  `NATIVE_GATEWAY_SECRET` Wrangler secret.
+- `CONTROL_SECRET` or `CONTROL_SECRET_FILE`: at least 32 characters; identical
+  to the Worker's `NATIVE_GATEWAY_SECRET` Wrangler secret. Production
+  deployments should mount a root-managed secret file instead of exposing the
+  value in container metadata.
 - `PUBLIC_WEBSOCKET_URL`: for example
   `wss://native.mitchellhynes.com/v1/connect`.
 - `PUBLIC_UDP_IP`: the instance's public IPv4 address.

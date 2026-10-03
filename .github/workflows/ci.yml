@@ -37,6 +37,13 @@ jobs:
         run: node --check services/web/src/index.js
       - name: Validate operations CLI syntax
         run: node --check tools/halo_telemetry.mjs
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Validate AWS infrastructure
+        run: |
+          python -m pip install cfn-lint==1.57.1
+          cfn-lint infra/aws-native-gateway/template.yml
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

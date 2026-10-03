@@ -3,6 +3,7 @@ mod session;
 
 use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -52,8 +53,7 @@ impl Config {
             .unwrap_or_else(|_| "127.0.0.1:8080".into())
             .parse()
             .map_err(|_| "BIND_ADDR is invalid")?;
-        let control_secret =
-            env::var("CONTROL_SECRET").map_err(|_| "CONTROL_SECRET is required")?;
+        let control_secret = secret_from_env_or_file("CONTROL_SECRET", "CONTROL_SECRET_FILE")?;
         if control_secret.len() < 32 {
             return Err("CONTROL_SECRET must contain at least 32 characters".into());
         }
@@ -102,6 +102,19 @@ impl Config {
             udp_port_start,
             udp_port_end,
         })
+    }
+}
+
+fn secret_from_env_or_file(value_name: &str, file_name: &str) -> Result<String, String> {
+    match (env::var(value_name), env::var(file_name)) {
+        (Ok(_), Ok(_)) => Err(format!(
+            "set only one of {value_name} or {file_name}, not both"
+        )),
+        (Ok(value), Err(_)) => Ok(value),
+        (Err(_), Ok(path)) => fs::read_to_string(path)
+            .map(|value| value.trim_end_matches(['\r', '\n']).to_owned())
+            .map_err(|_| format!("{file_name} could not be read")),
+        (Err(_), Err(_)) => Err(format!("{value_name} or {file_name} is required")),
     }
 }
 
