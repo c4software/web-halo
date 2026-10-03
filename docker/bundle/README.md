@@ -20,16 +20,25 @@ example `rsync -a --exclude .env`), then run `./start.sh` again.
 
 ## Game data
 
-The bundle does not include or serve game data. On first use, each player
-chooses an Xbox disc image (`.xiso` or `.iso`) made from their own copy of
-Halo: Combat Evolved. The browser copies the maps to its own local storage
-and reads them from there. The disc image never leaves the player's device.
+The bundle does not include game data.
+
+By default it does not serve it either. On first use, each player chooses
+an Xbox disc image (`.xiso` or `.iso`) made from their own copy of Halo:
+Combat Evolved. The browser copies the maps to its own local storage and
+reads them from there. The disc image never leaves the player's device.
+
+A bundle with hosted maps (it has `compose.override.yaml`) serves the maps
+instead, and the page asks for no disc image. Put the `.map` files in the
+folder `HALO_MAPS` of `.env` (`./maps` by default). The folder must be
+readable by everyone (`chmod -R a+rX`): the server runs as nobody.
+`start.sh` stops when `ui.map` is not there. A browser that already has an
+XISO in its local storage keeps using it.
 
 ## Services
 
 | Service | Port (`.env`) | Purpose |
 | --- | --- | --- |
-| `web` | `HALO_WEB_PORT` (8765) | The game files, with the COOP and COEP headers |
+| `web` | `HALO_WEB_PORT` (8765) | The game files (and the maps, with hosted maps), with the COOP and COEP headers |
 | `signaling` | `HALO_SIGNALING_PORT` (8787) | Connects the browsers (online lobbies) |
 
 They listen on `HALO_BIND` (`127.0.0.1` by default).

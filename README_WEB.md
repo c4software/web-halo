@@ -12,9 +12,9 @@ machine without a rebuild.
 | `halo-web.sh` | The script that does everything: build, local servers, bundle for another machine. |
 | `compose.yaml` | The services `web` (build commands), `serve` (local server) and `signaling`. |
 | `docker/web/Dockerfile` | The build image: `emscripten/emsdk:6.0.10` and `ninja-build`. |
-| `docker/web/localize_page.py` | Points the built page at the local signaling service. |
+| `docker/web/localize_page.py` | Makes the page from `port/web/shell.html`: local signaling service, and no XISO gate with hosted maps. Checks the built page. |
 | `docker/signaling/` | The image of the signaling service (`services/signaling`), run with `wrangler dev`. |
-| `docker/bundle/` | The files of the bundle: `compose.yaml`, `env.example`, `start.sh`, `README.md`. |
+| `docker/bundle/` | The files of the bundle: `compose.yaml`, `env.example`, `start.sh`, `README.md`, and `compose.hosted-maps.yaml` for hosted maps. |
 
 - The repository is mounted at `/src`. `build/` stays on the computer.
 - The containers run with the UID and GID of the user (1000:1000 by default;
@@ -36,16 +36,34 @@ machine without a rebuild.
 ./halo-web.sh serve               # serve the game and the signaling service
 ./halo-web.sh stop                # stop the local services
 ./halo-web.sh package [--url https://halo.example.lan] [--output DIR]
+./halo-web.sh build --hosted-maps [--iso Halo.iso]   # the server serves the maps
+./halo-web.sh serve --hosted-maps
+./halo-web.sh package --hosted-maps [...]
 ```
 
 `build` does these steps:
 
 1. It builds the Docker image.
-2. If `build.ninja` does not have the release web target, it runs
+2. With `--hosted-maps`, if `assets/maps` does not exist, it extracts the
+   maps from the disc image (`--iso`, or the only `.iso` or `.xiso` in the
+   repository root) with `tools/xiso_extract.py`.
+3. If `build.ninja` does not have the release web target, it runs
    `configure.py --release --pgo=off --lto=off`, as `tools/web_run.py` does.
-3. It runs `ninja web`.
-4. It points the page at the local signaling service.
-5. It copies `port/web/coi-serviceworker.js` next to the page, which loads it.
+4. It makes the page `build/docker/shell.html` from `port/web/shell.html`
+   with `docker/web/localize_page.py` (see below). The source page is not
+   changed: the working tree stays clean, also when the build fails or
+   stops.
+5. It runs `ninja web` with `build/docker/shell.html` mounted over
+   `port/web/shell.html` in the container (`docker compose run -v`). So the
+   link reads the page of the Docker environment, with the rules of
+   `tools/web_build.py` as they are. `ninja` relinks the page when that file
+   is newer, so a change of mode relinks the page (about ten seconds).
+6. It checks the built page: an empty signaling URL and Turnstile site key,
+   no Turnstile script, and the XISO gate present or absent as the mode says.
+7. It copies `port/web/coi-serviceworker.js` next to the page, which loads
+   it.
+8. With `--hosted-maps`, it links `build/web/assets/maps` to `assets/maps`,
+   where the page reads the maps. Without it, it removes that link.
 
 `serve` then serves the game at
 <http://127.0.0.1:8765/build/web/halo.html>. The server sends the COOP and
@@ -55,12 +73,32 @@ recommended.
 
 ## Game data
 
-The build does not include game data, and the servers do not serve it. On
-first use, the page asks each player for an Xbox disc image (`.xiso` or
-`.iso`) made from their own copy of Halo: Combat Evolved. The browser copies
-the maps to its origin-private storage and reads them from there. The disc
-image never leaves the player's device. Thus `halo-web.sh` does not extract
-the maps, and the bundle does not mount them.
+By default, the build does not include game data, and the servers do not
+serve it. On first use, the page asks each player for an Xbox disc image
+(`.xiso` or `.iso`) made from their own copy of Halo: Combat Evolved. The
+browser copies the maps to its origin-private storage and reads them from
+there. The disc image never leaves the player's device. Thus `halo-web.sh`
+does not extract the maps, and the bundle does not mount them.
+
+With `--hosted-maps`, the server serves the maps and the page does not ask
+for a disc image: `localize_page.py` removes the XISO gate (`beginXisoGate`
+in `preRun`) from the page. The game then reads the maps over HTTP, with
+byte ranges, from `assets/maps` next to the page
+(`build/web/assets/maps/`, see `port/web/src/web_platform.c`). Locally,
+that folder is a link to `assets/maps`; the bundle mounts the folder
+`HALO_MAPS` of the target there. Use this mode only where you may give the
+game data to the players.
+
+The build, `serve` and `package` must use the same mode. The page records
+its mode (`<meta name="halo-maps" content="xiso">` or `hosted`), and
+`serve` and `package` stop with a message when it is not their mode.
+
+An XISO that a browser already copied to its storage still has precedence
+in hosted mode: the page's fetch of a map goes to that storage first
+(`port/web/fetch_path_normalization.js`, `HaloXiso.responseForMapRequest`)
+and to the server only when no XISO is installed there. As the maps are
+the same, this does not matter. To use the maps of the server, clear the
+site data of the page in the browser.
 
 ## Local multiplayer
 
@@ -71,10 +109,14 @@ All services run on the computer. No Cloudflare service is necessary.
   and simulates Durable Objects, KV and rate limits locally. The state is in
   the `signaling-data` volume. The service only connects the browsers
   (WebRTC signaling). The game traffic goes directly between the browsers.
-- After the build, `docker/web/localize_page.py` changes
-  `build/web/halo.html`: it empties the signaling URL and the Turnstile site
-  key, and removes the Turnstile script. Without a signaling URL, a page on
-  `127.0.0.1` or `localhost` uses `http://<host>:8787`.
+- Before the link, `docker/web/localize_page.py` makes the page
+  `build/docker/shell.html` from `port/web/shell.html`: it empties the
+  signaling URL and the Turnstile site key, and removes the Turnstile
+  script. It works on the readable source page, never on the minified page
+  the link makes, and stops with a message if the source page is minified
+  or if it does not find each pattern exactly once (the page changed
+  upstream). Without a signaling URL, a page on `127.0.0.1` or `localhost`
+  uses `http://<host>:8787`.
 - The service runs in `development` mode, without Turnstile. It makes new
   secrets (`ROOM_ID_SECRET`, `ABUSE_ID_SECRET`, `ADMIN_TOKEN`) at each start,
   unless the environment gives them.
@@ -97,6 +139,16 @@ compile anything.
   `start.sh` loads them, so the target does not need Internet access.
 - `compose.yaml`, `start.sh` and `README.md`, from `docker/bundle/`, and
   `.env`, from `docker/bundle/env.example`.
+
+With `--hosted-maps` (for a build made with it), the bundle also has:
+
+- `compose.override.yaml`, from `docker/bundle/compose.hosted-maps.yaml`,
+  which Compose loads with `compose.yaml`. It mounts the folder `HALO_MAPS`
+  of the target read-only at `www/build/web/assets/maps`, an empty folder in
+  the bundle. The maps (1.7 GiB) are not copied.
+- `HALO_MAPS` in `.env` (`./maps` by default). `start.sh` stops when
+  `ui.map` is not in that folder. The server runs as nobody: the folder must
+  be readable by everyone (`chmod -R a+rX`).
 
 `HALO_PUBLIC_ORIGIN` in `.env` selects one of two uses:
 
@@ -121,7 +173,7 @@ isolation. `HALO_BIND` (`127.0.0.1` by default) is the listen address. Use
    ```
 
 2. On the server, set `HALO_PUBLIC_ORIGIN` (and `HALO_BIND` if necessary) in
-   `.env`.
+   `.env`. For a bundle with hosted maps, set `HALO_MAPS` too.
 3. On the server, start the services:
 
    ```sh
@@ -166,16 +218,23 @@ SDL3. It can write to the repository (`build/`, `build.ninja`).
 From the repository root:
 
 ```sh
-# 1. Configure and build (the same options as tools/web_run.py)
-docker compose run --rm web sh -c 'python3 configure.py --release --pgo=off --lto=off && ninja web'
+# 1. Configure (the same options as tools/web_run.py)
+docker compose run --rm web python3 configure.py --release --pgo=off --lto=off
 
-# 2. Use the local signaling service
-docker compose run --rm web python3 docker/web/localize_page.py
+# 2. Make the page for the local signaling service (add --hosted-maps for
+#    hosted maps), then build with it in place of the source page
+mkdir -p build/docker
+docker compose run --rm web python3 docker/web/localize_page.py patch port/web/shell.html build/docker/shell.html
+docker compose run --rm -v "$PWD/build/docker/shell.html:/src/port/web/shell.html:ro" web ninja web
+docker compose run --rm web python3 docker/web/localize_page.py verify build/web/halo.html
 
 # 3. Copy the script that the page loads from its own folder
 cp port/web/coi-serviceworker.js build/web/
 
-# 4. Serve the game and the signaling service
+# 4. Hosted maps only: the page reads the maps next to it
+ln -sfn ../../../assets/maps build/web/assets/maps
+
+# 5. Serve the game and the signaling service
 docker compose up serve signaling
 ```
 
